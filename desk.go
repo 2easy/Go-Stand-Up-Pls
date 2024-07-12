@@ -69,6 +69,20 @@ func (d *desk) SetSpeed(speed uint8) {
 	d.mux.Unlock()
 }
 
+func DiscoverBLEDevices(adapter *bluetooth.Adapter, scanResults chan<- bluetooth.ScanResult, deskAddress string) error {
+	// Start scanning.
+	slog.Info("Scanning BLE devices")
+	err := adapter.Scan(func(adapter *bluetooth.Adapter, result bluetooth.ScanResult) {
+		slog.Info("found device", "address", result.Address.String(), "rssi", result.RSSI, "local_name", result.LocalName())
+		if result.Address.String() == deskAddress {
+			adapter.StopScan()
+			scanResults <- result
+		}
+	})
+
+	return err
+}
+
 func (d *desk) Connect() error {
 	// Enable BLE interface.
 	adapter := bluetooth.DefaultAdapter
@@ -78,28 +92,17 @@ func (d *desk) Connect() error {
 
 	scanResults := make(chan bluetooth.ScanResult, 1)
 
-	// Start scanning.
-	slog.Info("Scanning BLE devices")
-	err := adapter.Scan(func(adapter *bluetooth.Adapter, result bluetooth.ScanResult) {
-		slog.Debug("found device", "address", result.Address.String(), "rssi", result.RSSI, "local_name", result.LocalName())
-		if result.Address.String() == d.address {
-			adapter.StopScan()
-			scanResults <- result
-		}
-	})
+	err := DiscoverBLEDevices(adapter, scanResults, d.address)
 	if err != nil {
 		return fmt.Errorf("could not initiate bluetooth scan: %w", err)
 	}
 
-	var device bluetooth.Device
-	select {
-	case result := <-scanResults:
-		device, err = adapter.Connect(result.Address, bluetooth.ConnectionParams{})
-		if err != nil {
-			return fmt.Errorf("could not connect to the desk: %w", err)
-		}
-		slog.Info("Connected to the device", "address", result.Address.String(), "local_name", result.LocalName())
+	result := <-scanResults
+	device, err := adapter.Connect(result.Address, bluetooth.ConnectionParams{})
+	if err != nil {
+		return fmt.Errorf("could not connect to the desk: %w", err)
 	}
+	slog.Info("Connected to the device", "address", result.Address.String(), "local_name", result.LocalName())
 
 	// Get UART service for the device
 	slog.Debug("discovering services/characteristics")

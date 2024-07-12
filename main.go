@@ -11,6 +11,7 @@ import (
 
 	gosxnotifier "github.com/deckarep/gosx-notifier"
 	"github.com/urfave/cli/v2"
+	"tinygo.org/x/bluetooth"
 )
 
 func parsePosition(positionStr string) (uint8, time.Duration) {
@@ -44,8 +45,13 @@ func main() {
 				Name:  "scan",
 				Usage: "scan bluetooth devices, CTRL+c to stop",
 				Action: func(cCtx *cli.Context) error {
-					slog.Info("TODO: Scanning")
-					return nil
+					// Enable BLE interface.
+					adapter := bluetooth.DefaultAdapter
+					if err := adapter.Enable(); err != nil {
+						return fmt.Errorf("could not enable BLE stack: %w", err)
+					}
+
+					return DiscoverBLEDevices(adapter, nil, "random string should not stop the scan")
 				},
 			},
 			{
