@@ -136,7 +136,7 @@ func (d *desk) Connect() error {
 	d.txChar.EnableNotifications(func(buf []byte) {
 		// println("data:", buf)
 		slog.Debug("Notification Received", "buffer", buf)
-		if len(buf) > 3 { // Ignore shorter messages
+		if len(buf) > 3 && uint8(buf[3]) != 0 { // Ignore shorter and error messages
 			d.SetHeight(uint8(buf[3]))
 			d.SetSpeed(uint8(buf[1]))
 			slog.Debug("Parameters updated", "height", d.GetHeight(), "speed", d.GetSpeed())
